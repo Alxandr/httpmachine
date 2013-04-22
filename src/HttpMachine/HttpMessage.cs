@@ -7,6 +7,11 @@ using System.Threading.Tasks;
 
 namespace HttpMachine
 {
+    ///-------------------------------------------------------------------------------------------------
+    /// <summary>   Helper class for parsing HTTP messages. </summary>
+    ///
+    /// <remarks>   Aleksander, 22.04.2013. </remarks>
+    ///-------------------------------------------------------------------------------------------------
     public class HttpMessageParser : IHttpParserDelegate
     {
         HttpParser _parser;
@@ -22,57 +27,57 @@ namespace HttpMachine
             _messages = new Queue<IHttpMessage>();
         }
 
-        public void OnMessageBegin(HttpParser parser)
+        void IHttpParserDelegate.OnMessageBegin(HttpParser parser)
         {
             // Ignore
         }
 
-        public void OnMethod(HttpParser parser, string method)
+        void IHttpParserDelegate.OnMethod(HttpParser parser, string method)
         {
             _message.Method = method;
         }
 
-        public void OnRequestUri(HttpParser parser, string requestUri)
+        void IHttpParserDelegate.OnRequestUri(HttpParser parser, string requestUri)
         {
             _message.RequestUri = requestUri;
         }
 
-        public void OnPath(HttpParser parser, string path)
+        void IHttpParserDelegate.OnPath(HttpParser parser, string path)
         {
             _message.RequestPath = path;
         }
 
-        public void OnFragment(HttpParser parser, string fragment)
+        void IHttpParserDelegate.OnFragment(HttpParser parser, string fragment)
         {
             _message.Fragment = fragment;
         }
 
-        public void OnQueryString(HttpParser parser, string queryString)
+        void IHttpParserDelegate.OnQueryString(HttpParser parser, string queryString)
         {
             _message.QueryString = queryString;
         }
 
-        public void OnHeaderName(HttpParser parser, string name)
+        void IHttpParserDelegate.OnHeaderName(HttpParser parser, string name)
         {
             _header = name;
         }
 
-        public void OnHeaderValue(HttpParser parser, string value)
+        void IHttpParserDelegate.OnHeaderValue(HttpParser parser, string value)
         {
             _message.Headers.Add(new KeyValuePair<string, string>(_header, value));
         }
 
-        public void OnHeadersEnd(HttpParser parser)
+        void IHttpParserDelegate.OnHeadersEnd(HttpParser parser)
         {
             // Ignore
         }
 
-        public void OnBody(HttpParser parser, ArraySegment<byte> data)
+        void IHttpParserDelegate.OnBody(HttpParser parser, ArraySegment<byte> data)
         {
             _message.BodyBytes.Add(data);
         }
 
-        public void OnMessageEnd(HttpParser parser)
+        void IHttpParserDelegate.OnMessageEnd(HttpParser parser)
         {
             // Create stream
             var length = _message.BodyBytes.Aggregate(0, (s, b) => s + b.Count);
@@ -97,33 +102,117 @@ namespace HttpMachine
             _message = new HttpMessage();
         }
 
-        public IEnumerable<IHttpMessage> Execute(ArraySegment<byte> arraySegment)
+        ///-------------------------------------------------------------------------------------------------
+        /// <summary>
+        /// Parses the input-data and returns a list of 0 or more requrests contained in the data. Not
+        /// thread-safe.
+        /// </summary>
+        ///
+        /// <param name="data"> The byte-data to be parsed. </param>
+        ///
+        /// <returns>   A list of 0 or more requests found in the passed data. </returns>
+        ///-------------------------------------------------------------------------------------------------
+        public IEnumerable<IHttpMessage> Execute(ArraySegment<byte> data)
         {
             long totalLength = 0;
             List<IHttpMessage> result = new List<IHttpMessage>();
             while (true)
             {
-                totalLength += _parser.Execute(arraySegment);
+                totalLength += _parser.Execute(data);
                 while (_messages.Count > 0)
                     result.Add(_messages.Dequeue());
 
-                if (totalLength >= arraySegment.Count)
+                if (totalLength >= data.Count)
                     return result;
             }
         }
+
+        ///-------------------------------------------------------------------------------------------------
+        /// <summary>
+        /// Parses the input-data and returns a list of 0 or more requrests contained in the data. Not
+        /// thread-safe.
+        /// </summary>
+        ///
+        /// <param name="data"> The byte-data to be parsed. </param>
+        ///
+        /// <returns>   A list of 0 or more requests found in the passed data. </returns>
+        ///-------------------------------------------------------------------------------------------------
+        public IEnumerable<IHttpMessage> Execute(byte[] data)
+        {
+            return Execute(new ArraySegment<byte>(data));
+        }
     }
 
+    ///-------------------------------------------------------------------------------------------------
+    /// <summary>   Represents a parsed HTTP request. </summary>
+    ///
+    /// <remarks>   
+    /// The IHttpMessage interface provides all known data about a parsed HTTP request.
+    /// </remarks>
+    ///-------------------------------------------------------------------------------------------------
     public interface IHttpMessage
     {
+        ///-------------------------------------------------------------------------------------------------
+        /// <summary>   Gets the HTTP data transfer method (such as GET, POST, or HEAD). </summary>
+        ///
+        /// <value> The HTTP data transfer method. </value>
+        ///-------------------------------------------------------------------------------------------------
         string Method { get; }
+
+        ///-------------------------------------------------------------------------------------------------
+        /// <summary>   Gets the raw URL of the current request. </summary>
+        ///
+        /// <value> The request uri. </value>
+        ///-------------------------------------------------------------------------------------------------
         string RequestUri { get; }
+
+        ///-------------------------------------------------------------------------------------------------
+        /// <summary>   Gets the full pathname of the request file. </summary>
+        ///
+        /// <value> The full pathname of the request file. </value>
+        ///-------------------------------------------------------------------------------------------------
         string RequestPath { get; }
+
+        ///-------------------------------------------------------------------------------------------------
+        /// <summary>   Gets the path fragment. </summary>
+        ///
+        /// <value> The path fragment. </value>
+        ///-------------------------------------------------------------------------------------------------
         string Fragment { get; }
+
+        ///-------------------------------------------------------------------------------------------------
+        /// <summary>   Gets the query string. </summary>
+        ///
+        /// <value> The query string. </value>
+        ///-------------------------------------------------------------------------------------------------
         string QueryString { get; }
+
+        ///-------------------------------------------------------------------------------------------------
+        /// <summary>   Gets the headers. </summary>
+        ///
+        /// <value> The headers. </value>
+        ///-------------------------------------------------------------------------------------------------
         IList<KeyValuePair<string, string>> Headers { get; }
+
+        ///-------------------------------------------------------------------------------------------------
+        /// <summary>   Gets the body. </summary>
+        ///
+        /// <value> The body. </value>
+        ///-------------------------------------------------------------------------------------------------
         Stream Body { get; }
 
+        ///-------------------------------------------------------------------------------------------------
+        /// <summary>   Gets the http version. </summary>
+        ///
+        /// <value> The http version. </value>
+        ///-------------------------------------------------------------------------------------------------
         Version HttpVersion { get; }
+
+        ///-------------------------------------------------------------------------------------------------
+        /// <summary>   Gets a value indicating whether we should keep alive the connection. </summary>
+        ///
+        /// <value> true if we should keep alive the connection, false if not. </value>
+        ///-------------------------------------------------------------------------------------------------
         bool ShouldKeepAlive { get; }
     }
 
